@@ -32,18 +32,18 @@ public class QRAttendance {
         }
     }
 
-    public void setUI(SystemUI ui) {
-        this.ui = ui;
-        startCamera();
-    }
-
     public static void main(String[] args) {
         QRAttendance system = new QRAttendance();
         SwingUtilities.invokeLater(() -> {
             SystemUI ui = new SystemUI(system);
-            system.setUI(ui); // Now UI is set
+            system.setUI(ui);
             ui.setVisible(true);
         });
+    }
+
+    public void setUI(SystemUI ui) {
+        this.ui = ui;
+        startCamera();
     }
 
     private void startCamera() {
@@ -69,7 +69,7 @@ public class QRAttendance {
                         System.out.println("QR Code Detected: " + qrText);
                         paused = true;
                     }
-                    updateFeed(frame);
+                    ui.updateLabel(frame);
                 } else {
                     try {
                         Thread.sleep(2000);
@@ -91,9 +91,5 @@ public class QRAttendance {
 //                    Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 255, 0), 2);
 //        }
         return decodedText;
-    }
-
-    private void updateFeed(Mat frame) {
-        ui.updateLabel(frame);
     }
 }
