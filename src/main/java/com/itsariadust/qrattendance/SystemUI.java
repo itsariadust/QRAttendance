@@ -5,15 +5,31 @@ import org.opencv.core.Mat;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.text.*;
+import java.util.Calendar;
 
 public class SystemUI extends JFrame {
     private static QRAttendance qrAttendance;
+    // Component variables
     private JLabel imageLabel;
+    private JLabel label;
+    private JLabel timeLabel;
+    private JLabel dayLabel;
+    private JLabel dateLabel;
+    private JTextField[] textFields;
+
+    // Variables for dates
+    private SimpleDateFormat timeFormat;
+    private SimpleDateFormat dayFormat;
+    private SimpleDateFormat dateFormat;
+    private String time;
+    private String day;
+    private String date;
 
     public SystemUI(QRAttendance qrAttendance) {
         this.qrAttendance = qrAttendance;
         setTitle("QR Attendance System");
-        setSize(800, 600);
+        setSize(1280, 960);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new GridBagLayout());
 
@@ -24,7 +40,7 @@ public class SystemUI extends JFrame {
         // Left side: Camera feed
         JPanel cameraPanel = new JPanel();
         cameraPanel.setBackground(Color.BLACK);
-        cameraPanel.setPreferredSize(new Dimension(400, 600));
+        cameraPanel.setPreferredSize(new Dimension(600, 600));
         cameraPanel.setBorder(BorderFactory.createTitledBorder("Camera Feed"));
 
         imageLabel = new JLabel();
@@ -49,10 +65,10 @@ public class SystemUI extends JFrame {
 
         // Labels and TextFields
         String[] labels = {"Student No:", "Name:", "Program:", "Year Level:", "Status:"};
-        JTextField[] textFields = new JTextField[labels.length];
+        textFields = new JTextField[labels.length];
 
         for (int i = 0; i < labels.length; i++) {
-            JLabel label = new JLabel(labels[i]);
+            label = new JLabel(labels[i]);
             textFields[i] = new JTextField(20);
             textFields[i].setEditable(false);
             textFields[i].setFocusable(false);
@@ -75,18 +91,35 @@ public class SystemUI extends JFrame {
         gbc.weighty = 0.3;
         add(studentInfoPanel, gbc);
 
-        // Right bottom: Recent log table
-        String[] columnNames = {"Student ID", "Name", "Time", "Status"};
-        JTable logTable = new JTable(new Object[][]{}, columnNames);
-        JScrollPane scrollPane = new JScrollPane(logTable);
-        JPanel tablePanel = new JPanel(new BorderLayout());
-        tablePanel.setBorder(BorderFactory.createTitledBorder("Recent Log"));
-        tablePanel.add(scrollPane, BorderLayout.CENTER);
+        // Right bottom: Clock
+        JPanel clockPanel = new JPanel(new BorderLayout());
+        clockPanel.setBorder(BorderFactory.createTitledBorder("Clock"));
+        timeFormat = new SimpleDateFormat("kk:mm:ss");
+        dayFormat = new SimpleDateFormat("EEEE");
+        dateFormat = new SimpleDateFormat("MMMMM dd, yyyy");
+
+        timeLabel = new JLabel("", SwingConstants.CENTER);  // Center aligned
+        timeLabel.setFont(new Font("Verdana", Font.PLAIN, 100));
+
+        dayLabel = new JLabel("", SwingConstants.CENTER);
+        dayLabel.setFont(new Font("Verdana", Font.PLAIN, 50));
+
+        dateLabel = new JLabel("", SwingConstants.CENTER);
+        dateLabel.setFont(new Font("Verdana", Font.PLAIN, 50));
+
+        clockPanel.add(timeLabel, BorderLayout.CENTER);
+
+        JPanel bottomPanel = new JPanel(new GridLayout(2, 1));
+        bottomPanel.add(dayLabel);
+        bottomPanel.add(dateLabel);
+        clockPanel.add(bottomPanel, BorderLayout.SOUTH);
 
         gbc.gridx = 1;
         gbc.gridy = 1;
         gbc.weighty = 0.7;
-        add(tablePanel, gbc);
+        add(clockPanel, gbc);
+
+        setTime();
     }
 
     public void updateLabel(Mat frame) {
@@ -104,6 +137,26 @@ public class SystemUI extends JFrame {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
         image.getRaster().setDataElements(0, 0, width, height, sourcePixels);
         return image;
+    }
+
+    public void setTime() {
+        // Update time immediately
+        updateClock();
+
+        // Set up a timer to update the clock every second
+        Timer timer = new Timer(1000, e -> updateClock());
+        timer.start();
+    }
+
+    private void updateClock() {
+        time = timeFormat.format(Calendar.getInstance().getTime());
+        timeLabel.setText(time);
+
+        day = dayFormat.format(Calendar.getInstance().getTime());
+        dayLabel.setText(day);
+
+        date = dateFormat.format(Calendar.getInstance().getTime());
+        dateLabel.setText(date);
     }
 
     public static void main(String[] args) {
