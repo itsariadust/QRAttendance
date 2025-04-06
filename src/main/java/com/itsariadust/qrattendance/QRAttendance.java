@@ -19,14 +19,16 @@ public class QRAttendance {
     private boolean running;
     private boolean paused;
     private SystemUI ui;
+    private static int cameraID;
 
     static {
-        System.load("/usr/lib/java/libopencv_java4100.so");
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) {
             System.load("C:\\opencv\\build\\java\\x64\\opencv_java4100.dll");
+            cameraID = 0;
         } else {
             System.load("/usr/lib/java/libopencv_java4100.so");
+            cameraID = 1;
         }
     }
 
@@ -45,7 +47,7 @@ public class QRAttendance {
     }
 
     private void startCamera() {
-        camera = new VideoCapture(1);
+        camera = new VideoCapture(cameraID);
         if (!camera.isOpened()) {
             System.out.println("Error: Camera not found!");
             return;
