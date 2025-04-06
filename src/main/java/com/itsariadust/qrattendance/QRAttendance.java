@@ -22,6 +22,12 @@ public class QRAttendance {
 
     static {
         System.load("/usr/lib/java/libopencv_java4100.so");
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            System.load("C:\\opencv\\build\\java\\x64\\opencv_java4100.dll");
+        } else {
+            System.load("/usr/lib/java/libopencv_java4100.so");
+        }
     }
 
     public void setUI(SystemUI ui) {
