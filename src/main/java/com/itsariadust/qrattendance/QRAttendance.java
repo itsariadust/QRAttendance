@@ -35,6 +35,11 @@ public class QRAttendance {
     private boolean paused;
     private SystemUI ui;
     private static int cameraID;
+    private String studentNumber;
+    private String studentName;
+    private String studentProgram;
+    private String studentYearLevel;
+    private String studentAttendanceStatus;
 
     static {
         String os = System.getProperty("os.name").toLowerCase();
@@ -79,9 +84,6 @@ public class QRAttendance {
             Mat frame = new Mat();
             while (running) {
                 if (!paused && camera.read(frame)) {
-                    String qrText = detectQRCode(frame, qrDetector);
-                    if (!qrText.isEmpty()) {
-                        System.out.println("QR Code Detected: " + qrText);
                     String studentNo = detectQRCode(frame, qrDetector);
                     if (!studentNo.isEmpty()) {
                         System.out.println("QR Code Detected: " + studentNo);
@@ -92,6 +94,10 @@ public class QRAttendance {
                         }
                         System.out.println("Exists");
                         createEntry(studentNo);
+                        getInfo(studentNo);
+                        ui.displayStudentInfo(studentNumber, studentName,
+                                studentProgram, studentYearLevel,
+                                studentAttendanceStatus);
                         paused = true;
                     }
                     ui.updateLabel(frame);
@@ -151,6 +157,29 @@ public class QRAttendance {
         }
 
         createLogInRecord(studentNo);
+    }
+
+    private void getInfo(String studentNo) {
+        Optional<Students> studentRecord = jdbi.withHandle(handle ->
+            handle.createQuery("SELECT * FROM Students WHERE StudentNo = :studentNo")
+                    .bind("studentNo", studentNo)
+                    .mapToBean(Students.class)
+                    .findFirst()
+            );
+        if (studentRecord.isEmpty()) {
+            System.out.println("Student does not exist!");
+            return;
+        }
+
+        Optional<Attendance> attendanceRecord = checkAttendanceRecord(studentNo);
+        Attendance attendance = attendanceRecord.get();
+        Students student = studentRecord.get();
+
+        studentNumber = Long.toString(student.getStudentNo());
+        studentName = student.getFirstName() + " " + student.getMiddleName() + " " + student.getLastName();
+        studentProgram = student.getProgramId();
+        studentYearLevel = student.getYearLevel();
+        studentAttendanceStatus = attendance.getStatus();
     }
 
     private void createLogInRecord(String studentNo) {

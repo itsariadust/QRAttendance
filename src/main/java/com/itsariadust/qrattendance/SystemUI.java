@@ -159,6 +159,16 @@ public class SystemUI extends JFrame {
         dateLabel.setText(date);
     }
 
+    public void displayStudentInfo(String studentNo, String studentName,
+                                   String program, String yearLevel,
+                                   String status) {
+        textFields[0].setText(studentNo); // Student No.
+        textFields[1].setText(studentName); // Name
+        textFields[2].setText(program); // Program
+        textFields[3].setText(yearLevel); // Year Level
+        textFields[4].setText(status); // Status
+    }
+
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             SystemUI ui = new SystemUI(qrAttendance);
