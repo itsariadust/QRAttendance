@@ -130,7 +130,7 @@ public class QRAttendance {
     private Optional<Attendance> checkAttendanceRecord(String studentNo) {
         return jdbi.withHandle(handle ->
             handle.createQuery("""
-                    SELECT * FROM Attendance
+                    SELECT * FROM attendance
                     WHERE StudentNo = :studentNo
                     ORDER BY Timestamp DESC
                     LIMIT 1
@@ -160,7 +160,7 @@ public class QRAttendance {
 
     private void getInfo(String studentNo) {
         Optional<Students> studentRecord = jdbi.withHandle(handle ->
-            handle.createQuery("SELECT * FROM Students WHERE StudentNo = :studentNo")
+            handle.createQuery("SELECT * FROM students WHERE StudentNo = :studentNo")
                     .bind("studentNo", studentNo)
                     .mapToBean(Students.class)
                     .findFirst()
@@ -180,7 +180,7 @@ public class QRAttendance {
     private void createLogInRecord(String studentNo) {
         jdbi.useHandle(handle ->
                 handle.createUpdate("""
-                            INSERT INTO ATTENDANCE (StudentNo, Timestamp, Status)
+                            INSERT INTO attendance (StudentNo, Timestamp, Status)
                             VALUES(
                                 :studentNo,
                                 NOW(),
@@ -196,7 +196,7 @@ public class QRAttendance {
     private void createLogOutRecord(String studentNo) {
         jdbi.useHandle(handle ->
                 handle.createUpdate("""
-                            INSERT INTO ATTENDANCE (StudentNo, Timestamp, Status)
+                            INSERT INTO attendance (StudentNo, Timestamp, Status)
                             VALUES(
                                 :studentNo,
                                 NOW(),
