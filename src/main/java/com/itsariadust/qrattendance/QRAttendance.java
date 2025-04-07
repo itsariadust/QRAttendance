@@ -90,7 +90,8 @@ public class QRAttendance {
                         Boolean isStudent = checkStudent(studentNo);
                         if (!isStudent) {
                             System.out.println("Doesn't exist");
-                            return;
+                            paused = true;
+                            continue;
                         }
                         System.out.println("Exists");
                         createEntry(studentNo);
@@ -103,7 +104,7 @@ public class QRAttendance {
                     ui.updateLabel(frame);
                 } else {
                     try {
-                        Thread.sleep(2000);
+                        Thread.sleep(1000);
                         paused = false;
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
