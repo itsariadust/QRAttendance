@@ -169,6 +169,10 @@ public class SystemUI extends JFrame {
         textFields[4].setText(status); // Status
     }
 
+    public void invalidStudentDialog() {
+        JOptionPane.showMessageDialog(this.rootPane, "Invalid student. Please try again.", "Warning", JOptionPane.WARNING_MESSAGE);
+    }
+
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             SystemUI ui = new SystemUI(qrAttendance);

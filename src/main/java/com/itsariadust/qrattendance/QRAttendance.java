@@ -86,14 +86,12 @@ public class QRAttendance {
                 if (!paused && camera.read(frame)) {
                     String studentNo = detectQRCode(frame, qrDetector);
                     if (!studentNo.isEmpty()) {
-                        System.out.println("QR Code Detected: " + studentNo);
                         Boolean isStudent = checkStudent(studentNo);
                         if (!isStudent) {
-                            System.out.println("Doesn't exist");
+                            ui.invalidStudentDialog();
                             paused = true;
                             continue;
                         }
-                        System.out.println("Exists");
                         createEntry(studentNo);
                         getInfo(studentNo);
                         ui.displayStudentInfo(studentNumber, studentName,
