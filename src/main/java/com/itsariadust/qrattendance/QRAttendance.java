@@ -167,12 +167,8 @@ public class QRAttendance {
                     .mapToBean(Students.class)
                     .findFirst()
             );
-        if (studentRecord.isEmpty()) {
-            System.out.println("Student does not exist!");
-            return;
-        }
-
         Optional<Attendance> attendanceRecord = checkAttendanceRecord(studentNo);
+
         Attendance attendance = attendanceRecord.get();
         Students student = studentRecord.get();
 
