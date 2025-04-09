@@ -132,27 +132,6 @@ public class QRAttendance {
 		return dao.findStudent(studentNo);
     }
 
-    private Optional<Attendance> checkAttendanceRecord(AttendanceDao dao, String studentNo) {
-        return dao.findLatestRecord(studentNo);
-    }
-
-    private void createEntry(AttendanceDao dao, String studentNo) {
-        Optional<Attendance> attendanceRecord = checkAttendanceRecord(dao, studentNo);
-        if (attendanceRecord.isEmpty()) {
-            createRecord(attendanceDao, studentNo, "LOGGED IN");
-            return;
-        }
-
-        Attendance attendance = attendanceRecord.get();
-
-        if ("LOGGED IN".equals(attendance.getStatus())) {
-            createRecord(attendanceDao, studentNo, "LOGGED OUT");
-            return;
-        }
-
-        createRecord(attendanceDao, studentNo, "LOGGED IN");
-    }
-
     private void getInfo(StudentDao studentDao, AttendanceDao attendanceDao, String studentNo) {
         Optional<Students> getStudent = studentDao.findStudent(studentNo);
         Optional<Attendance> attendanceRecord = checkAttendanceRecord(attendanceDao, studentNo);
@@ -167,7 +146,24 @@ public class QRAttendance {
         studentAttendanceStatus = attendance.getStatus();
     }
 
-    private void createRecord(AttendanceDao dao, String studentNo, String status) {
-        dao.insert(studentNo, LocalDateTime.now(), status);
+    private Optional<Attendance> checkAttendanceRecord(AttendanceDao dao, String studentNo) {
+        return dao.findLatestRecord(studentNo);
+    }
+
+    private void createEntry(AttendanceDao dao, String studentNo) {
+        Optional<Attendance> attendanceRecord = checkAttendanceRecord(dao, studentNo);
+        if (attendanceRecord.isEmpty()) {
+            dao.insert(studentNo, LocalDateTime.now(), "LOGGED IN");
+            return;
+        }
+
+        Attendance attendance = attendanceRecord.get();
+
+        if ("LOGGED IN".equals(attendance.getStatus())) {
+            dao.insert(studentNo, LocalDateTime.now(), "LOGGED OUT");
+            return;
+        }
+
+        dao.insert(studentNo, LocalDateTime.now(), "LOGGED IN");
     }
 }
