@@ -144,18 +144,18 @@ public class QRAttendance {
     private void createEntry(String studentNo) {
         Optional<Attendance> attendanceRecord = checkAttendanceRecord(studentNo);
         if (attendanceRecord.isEmpty()) {
-            createLogInRecord(studentNo);
+            createRecord(studentNo, "LOGGED IN");
             return;
         }
 
         Attendance attendance = attendanceRecord.get();
 
         if ("LOGGED IN".equals(attendance.getStatus())) {
-            createLogOutRecord(studentNo);
+            createRecord(studentNo, "LOGGED OUT");
             return;
         }
 
-        createLogInRecord(studentNo);
+        createRecord(studentNo, "LOGGED IN");
     }
 
     private void getInfo(String studentNo) {
@@ -177,7 +177,7 @@ public class QRAttendance {
         studentAttendanceStatus = attendance.getStatus();
     }
 
-    private void createLogInRecord(String studentNo) {
+    private void createRecord(String studentNo, String status) {
         jdbi.useHandle(handle ->
                 handle.createUpdate("""
                             INSERT INTO attendance (StudentNo, Timestamp, Status)
@@ -188,23 +188,7 @@ public class QRAttendance {
                             )
                         """)
                         .bind("studentNo", studentNo)
-                        .bind("status", "LOGGED IN")
-                        .execute()
-        );
-    }
-
-    private void createLogOutRecord(String studentNo) {
-        jdbi.useHandle(handle ->
-                handle.createUpdate("""
-                            INSERT INTO attendance (StudentNo, Timestamp, Status)
-                            VALUES(
-                                :studentNo,
-                                NOW(),
-                                :status
-                            )
-                        """)
-                        .bind("studentNo", studentNo)
-                        .bind("status", "LOGGED OUT")
+                        .bind("status", status)
                         .execute()
         );
     }
