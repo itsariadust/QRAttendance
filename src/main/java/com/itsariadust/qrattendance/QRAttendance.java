@@ -10,6 +10,8 @@ import io.github.cdimascio.dotenv.Dotenv;
 
 // JDBI for database
 import org.jdbi.v3.core.Jdbi;
+import org.jdbi.v3.core.mapper.reflect.BeanMapper;
+import org.jdbi.v3.sqlobject.*;
 
 // OpenCV libraries
 import org.opencv.core.*;
@@ -21,6 +23,7 @@ import org.opencv.objdetect.QRCodeDetector;
 import javax.swing.*;
 
 // Misc
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 public class QRAttendance {
@@ -28,7 +31,9 @@ public class QRAttendance {
     static String dbUrl = dotenv.get("DB_URL");
     static String dbUser = dotenv.get("DB_USERNAME");
     static String dbPass = dotenv.get("DB_PASSWORD");
-    static Jdbi jdbi = Jdbi.create(dbUrl, dbUser, dbPass);
+    static Jdbi jdbi;
+    static StudentDao studentDao;
+    static AttendanceDao attendanceDao;
 
     private VideoCapture camera;
     private boolean running;
@@ -54,6 +59,12 @@ public class QRAttendance {
 
     public static void main(String[] args) {
         QRAttendance system = new QRAttendance();
+        jdbi = Jdbi.create(dbUrl, dbUser, dbPass);
+        jdbi.installPlugin(new SqlObjectPlugin());
+        jdbi.registerRowMapper(BeanMapper.factory(Students.class));
+        jdbi.registerRowMapper(BeanMapper.factory(Attendance.class));
+        studentDao = jdbi.onDemand(StudentDao.class);
+        attendanceDao = jdbi.onDemand(AttendanceDao.class);
         SwingUtilities.invokeLater(() -> {
             SystemUI ui = new SystemUI(system);
             system.setUI(ui);
@@ -86,14 +97,13 @@ public class QRAttendance {
                 if (!paused && camera.read(frame)) {
                     String studentNo = detectQRCode(frame, qrDetector);
                     if (!studentNo.isEmpty()) {
-                        Boolean isStudent = checkStudent(studentNo);
-                        if (!isStudent) {
+                        if (checkStudent(studentDao, studentNo).isEmpty()) {
                             ui.invalidStudentDialog();
                             paused = true;
                             continue;
                         }
-                        createEntry(studentNo);
-                        getInfo(studentNo);
+                        createEntry(attendanceDao, studentNo);
+                        getInfo(studentDao, attendanceDao, studentNo);
                         ui.displayStudentInfo(studentNumber, studentName,
                                 studentProgram, studentYearLevel,
                                 studentAttendanceStatus);
@@ -118,57 +128,37 @@ public class QRAttendance {
 		return qrDetector.detectAndDecode(frame, points);
     }
 
-    private Boolean checkStudent(String studentNo) {
-        return jdbi.withHandle(handle ->
-            handle.createQuery("SELECT COUNT(*) FROM students WHERE StudentNo = :studentNo")
-                    .bind("studentNo", studentNo)
-                    .mapTo(Integer.class)
-                    .one() > 0
-        );
+    private Optional<Students> checkStudent(StudentDao dao, String studentNo) {
+		return dao.findStudent(studentNo);
     }
 
-    private Optional<Attendance> checkAttendanceRecord(String studentNo) {
-        return jdbi.withHandle(handle ->
-            handle.createQuery("""
-                    SELECT * FROM attendance
-                    WHERE StudentNo = :studentNo
-                    ORDER BY Timestamp DESC
-                    LIMIT 1
-                    """)
-                    .bind("studentNo", studentNo)
-                    .mapToBean(Attendance.class)
-                    .findFirst()
-        );
+    private Optional<Attendance> checkAttendanceRecord(AttendanceDao dao, String studentNo) {
+        return dao.findLatestRecord(studentNo);
     }
 
-    private void createEntry(String studentNo) {
-        Optional<Attendance> attendanceRecord = checkAttendanceRecord(studentNo);
+    private void createEntry(AttendanceDao dao, String studentNo) {
+        Optional<Attendance> attendanceRecord = checkAttendanceRecord(dao, studentNo);
         if (attendanceRecord.isEmpty()) {
-            createRecord(studentNo, "LOGGED IN");
+            createRecord(attendanceDao, studentNo, "LOGGED IN");
             return;
         }
 
         Attendance attendance = attendanceRecord.get();
 
         if ("LOGGED IN".equals(attendance.getStatus())) {
-            createRecord(studentNo, "LOGGED OUT");
+            createRecord(attendanceDao, studentNo, "LOGGED OUT");
             return;
         }
 
-        createRecord(studentNo, "LOGGED IN");
+        createRecord(attendanceDao, studentNo, "LOGGED IN");
     }
 
-    private void getInfo(String studentNo) {
-        Optional<Students> studentRecord = jdbi.withHandle(handle ->
-            handle.createQuery("SELECT * FROM students WHERE StudentNo = :studentNo")
-                    .bind("studentNo", studentNo)
-                    .mapToBean(Students.class)
-                    .findFirst()
-            );
-        Optional<Attendance> attendanceRecord = checkAttendanceRecord(studentNo);
+    private void getInfo(StudentDao studentDao, AttendanceDao attendanceDao, String studentNo) {
+        Optional<Students> getStudent = studentDao.findStudent(studentNo);
+        Optional<Attendance> attendanceRecord = checkAttendanceRecord(attendanceDao, studentNo);
 
         Attendance attendance = attendanceRecord.get();
-        Students student = studentRecord.get();
+        Students student = getStudent.get();
 
         studentNumber = Long.toString(student.getStudentNo());
         studentName = student.getFirstName() + " " + student.getMiddleName() + " " + student.getLastName();
@@ -177,19 +167,7 @@ public class QRAttendance {
         studentAttendanceStatus = attendance.getStatus();
     }
 
-    private void createRecord(String studentNo, String status) {
-        jdbi.useHandle(handle ->
-                handle.createUpdate("""
-                            INSERT INTO attendance (StudentNo, Timestamp, Status)
-                            VALUES(
-                                :studentNo,
-                                NOW(),
-                                :status
-                            )
-                        """)
-                        .bind("studentNo", studentNo)
-                        .bind("status", status)
-                        .execute()
-        );
+    private void createRecord(AttendanceDao dao, String studentNo, String status) {
+        dao.insert(studentNo, LocalDateTime.now(), status);
     }
 }

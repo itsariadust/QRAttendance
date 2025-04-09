@@ -7,6 +7,7 @@ public class Attendance {
   private java.sql.Timestamp timestamp;
   private String status;
 
+  public Attendance() {}
 
   public long getAttendanceId() {
     return attendanceId;

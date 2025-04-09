@@ -9,6 +9,7 @@ public class Students {
   private String programId;
   private String yearLevel;
 
+  public Students() {}
 
   public long getStudentNo() {
     return studentNo;
