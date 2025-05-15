@@ -12,6 +12,7 @@ import io.github.cdimascio.dotenv.Dotenv;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.reflect.BeanMapper;
 import org.jdbi.v3.sqlobject.*;
+import org.jdbi.v3.core.Handle;
 
 // OpenCV libraries
 import org.opencv.core.*;
@@ -24,16 +25,21 @@ import javax.swing.*;
 
 // Misc
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public class QRAttendance {
-    static Dotenv dotenv = Dotenv.load();
+    static Dotenv dotenv = Dotenv.configure()
+            .directory("src/main/resources/.env")
+            .load();
     static String dbUrl = dotenv.get("DB_URL");
     static String dbUser = dotenv.get("DB_USERNAME");
     static String dbPass = dotenv.get("DB_PASSWORD");
     static Jdbi jdbi;
     static StudentDao studentDao;
     static AttendanceDao attendanceDao;
+    AttendanceTableModel attendanceTableModel;
 
     private VideoCapture camera;
     private boolean running;
@@ -57,6 +63,10 @@ public class QRAttendance {
         }
     }
 
+    public QRAttendance() {
+        this.attendanceTableModel = new AttendanceTableModel();
+    }
+
     public static void main(String[] args) {
         QRAttendance system = new QRAttendance();
         jdbi = Jdbi.create(dbUrl, dbUser, dbPass);
@@ -66,10 +76,11 @@ public class QRAttendance {
         studentDao = jdbi.onDemand(StudentDao.class);
         attendanceDao = jdbi.onDemand(AttendanceDao.class);
         SwingUtilities.invokeLater(() -> {
-            SystemUI ui = new SystemUI(system);
+            SystemUI ui = new SystemUI(system, system.attendanceTableModel);
             system.setUI(ui);
             ui.setVisible(true);
         });
+        system.startPolling();
     }
 
     public void setUI(SystemUI ui) {
@@ -103,7 +114,7 @@ public class QRAttendance {
                             continue;
                         }
                         createEntry(attendanceDao, studentNo);
-                        getInfo(studentDao, attendanceDao, studentNo);
+                        getStudentInfo(studentDao, attendanceDao, studentNo);
                         ui.displayStudentInfo(studentNumber, studentName,
                                 studentProgram, studentYearLevel,
                                 studentAttendanceStatus);
@@ -132,7 +143,7 @@ public class QRAttendance {
 		return dao.findStudent(studentNo);
     }
 
-    private void getInfo(StudentDao studentDao, AttendanceDao attendanceDao, String studentNo) {
+    private void getStudentInfo(StudentDao studentDao, AttendanceDao attendanceDao, String studentNo) {
         Optional<Students> getStudent = studentDao.findStudent(studentNo);
         Optional<Attendance> attendanceRecord = checkAttendanceRecord(attendanceDao, studentNo);
 
@@ -165,5 +176,47 @@ public class QRAttendance {
         }
 
         dao.insert(studentNo, LocalDateTime.now(), "LOGGED IN");
+    }
+
+    public void startPolling() {
+        Timer timer = new Timer(2000, e -> {
+            try (Handle handle = jdbi.open()) {
+                List<Attendance> records = fetchAttendanceRecords(handle);
+                attendanceTableModel.setData(records); // UI update
+            } catch (Exception ex) {
+                ex.printStackTrace(); // Log appropriately
+            }
+        });
+        timer.start();
+    }
+
+    public List<Attendance> fetchAttendanceRecords(Handle handle) {
+        return handle.createQuery("SELECT * FROM attendance ORDER BY Timestamp DESC")
+                .map((rs, ctx) -> {
+                    Attendance record = new Attendance();
+                    record.setAttendanceId(rs.getLong("AttendanceID"));
+                    record.setStudentNo(rs.getLong("StudentNo"));
+                    record.setTimestamp(rs.getTimestamp("Timestamp"));
+                    record.setStatus(rs.getString("Status"));
+                    return record;
+                })
+                .list();
+    }
+
+    ArrayList<String> getAttendanceInfo(AttendanceDao attendanceDao, StudentDao studentDao, String idValue) {
+        ArrayList<String> record = new ArrayList<>();
+        Optional<Attendance> attendanceRecord = attendanceDao.findSpecificRecord(idValue);
+        Attendance attendance = attendanceRecord.get();
+
+        Optional<Students> getStudent = studentDao.findStudent(String.valueOf(attendance.getStudentNo()));
+        Students student = getStudent.get();
+
+        record.add(Long.toString(student.getStudentNo()));
+        record.add(student.getFirstName() + " " + student.getMiddleName() + " " + student.getLastName());
+        record.add(student.getProgramId());
+        record.add(student.getYearLevel());
+        record.add(attendance.getStatus());
+        record.add(attendance.getTimestamp().toString());
+        return record;
     }
 }
