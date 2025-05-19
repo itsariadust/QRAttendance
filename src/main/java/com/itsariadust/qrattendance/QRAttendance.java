@@ -21,9 +21,15 @@ import org.opencv.videoio.VideoCapture;
 import org.opencv.objdetect.QRCodeDetector;
 
 // Java Swing libraries
+import javax.imageio.ImageIO;
 import javax.swing.*;
 
 // Misc
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,25 +39,29 @@ public class QRAttendance {
     static Dotenv dotenv = Dotenv.configure()
             .directory("src/main/resources/.env")
             .load();
+
+    // Set up JDBI connection
     static String dbUrl = dotenv.get("DB_URL");
     static String dbUser = dotenv.get("DB_USERNAME");
     static String dbPass = dotenv.get("DB_PASSWORD");
     static Jdbi jdbi;
+
+    // DAOs for better table CRUD
     static StudentDao studentDao;
     static AttendanceDao attendanceDao;
     AttendanceTableModel attendanceTableModel;
 
     private VideoCapture camera;
+    private static int cameraID;
+
     private boolean running;
     private boolean paused;
-    private SystemUI ui;
-    private static int cameraID;
-    private String studentNumber;
-    private String studentName;
-    private String studentProgram;
-    private String studentYearLevel;
-    private String studentAttendanceStatus;
 
+    private String studentNo;
+
+    private SystemUI ui;
+
+    // Load appropriate library based on OS
     static {
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) {
@@ -106,7 +116,7 @@ public class QRAttendance {
             Mat frame = new Mat();
             while (running) {
                 if (!paused && camera.read(frame)) {
-                    String studentNo = detectQRCode(frame, qrDetector);
+                    studentNo = detectQRCode(frame, qrDetector);
                     if (!studentNo.isEmpty()) {
                         if (checkStudent(studentDao, studentNo).isEmpty()) {
                             ui.invalidStudentDialog();
@@ -114,16 +124,15 @@ public class QRAttendance {
                             continue;
                         }
                         createEntry(attendanceDao, studentNo);
-                        getStudentInfo(studentDao, attendanceDao, studentNo);
-                        ui.displayStudentInfo(studentNumber, studentName,
-                                studentProgram, studentYearLevel,
-                                studentAttendanceStatus);
                         paused = true;
                     }
                     ui.updateLabel(frame);
                 } else {
                     try {
-                        Thread.sleep(1000);
+                        ArrayList<String> studentInfo = getStudentInfo(studentDao, attendanceDao, studentNo);
+                        ui.displayStudentInfo(studentInfo);
+                        ui.displayImage(getStudentImage(studentDao, studentInfo));
+                        Thread.sleep(3000);
                         paused = false;
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
@@ -143,18 +152,14 @@ public class QRAttendance {
 		return dao.findStudent(studentNo);
     }
 
-    private void getStudentInfo(StudentDao studentDao, AttendanceDao attendanceDao, String studentNo) {
+    private ArrayList<String> getStudentInfo(StudentDao studentDao, AttendanceDao attendanceDao, String studentNo) {
+        ArrayList<String> studentInfo = new ArrayList<>();
         Optional<Students> getStudent = studentDao.findStudent(studentNo);
         Optional<Attendance> attendanceRecord = checkAttendanceRecord(attendanceDao, studentNo);
 
         Attendance attendance = attendanceRecord.get();
-        Students student = getStudent.get();
-
-        studentNumber = Long.toString(student.getStudentNo());
-        studentName = student.getFirstName() + " " + student.getMiddleName() + " " + student.getLastName();
-        studentProgram = student.getProgramId();
-        studentYearLevel = student.getYearLevel();
-        studentAttendanceStatus = attendance.getStatus();
+        populateInfo(studentInfo, attendance, getStudent);
+        return studentInfo;
     }
 
     private Optional<Attendance> checkAttendanceRecord(AttendanceDao dao, String studentNo) {
@@ -204,19 +209,52 @@ public class QRAttendance {
     }
 
     ArrayList<String> getAttendanceInfo(AttendanceDao attendanceDao, StudentDao studentDao, String idValue) {
-        ArrayList<String> record = new ArrayList<>();
+        ArrayList<String> attendanceInfo = new ArrayList<>();
         Optional<Attendance> attendanceRecord = attendanceDao.findSpecificRecord(idValue);
         Attendance attendance = attendanceRecord.get();
 
         Optional<Students> getStudent = studentDao.findStudent(String.valueOf(attendance.getStudentNo()));
+        populateInfo(attendanceInfo, attendance, getStudent);
+        attendanceInfo.add(attendance.getTimestamp().toString());
+        return attendanceInfo;
+    }
+
+    private void populateInfo(ArrayList<String> attendanceInfo, Attendance attendance, Optional<Students> getStudent) {
         Students student = getStudent.get();
 
-        record.add(Long.toString(student.getStudentNo()));
-        record.add(student.getFirstName() + " " + student.getMiddleName() + " " + student.getLastName());
-        record.add(student.getProgramId());
-        record.add(student.getYearLevel());
-        record.add(attendance.getStatus());
-        record.add(attendance.getTimestamp().toString());
-        return record;
+        attendanceInfo.add(Long.toString(student.getStudentNo()));
+        attendanceInfo.add(student.getFirstName() + " " + student.getMiddleName() + " " + student.getLastName());
+        attendanceInfo.add(student.getProgramId());
+        attendanceInfo.add(student.getYearLevel());
+        attendanceInfo.add(attendance.getStatus());
     }
+
+    public ImageIcon getStudentImage(StudentDao studentDao, ArrayList<String> studentInfo) {
+        try {
+            if (studentInfo == null || studentInfo.isEmpty()) {
+                return null;
+            }
+
+            byte[] studentImg = studentDao.findPicture(studentInfo.getFirst());
+
+            if (studentImg == null || studentImg.length == 0) {
+                return null;
+            }
+
+            InputStream is = new ByteArrayInputStream(studentImg);
+            BufferedImage img = ImageIO.read(is);
+            Image scaledImg = img.getScaledInstance(1000, 1000, Image.SCALE_SMOOTH);
+            if (scaledImg == null) {
+                System.out.println("ImageIO.read returned null – image data may be corrupted or invalid format.");
+                return null;
+            }
+
+            return new ImageIcon(scaledImg);
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
 }

@@ -8,8 +8,8 @@ public class Students {
   private String lastName;
   private String programId;
   private String yearLevel;
+  private byte[] picture;
 
-  public Students() {}
 
   public long getStudentNo() {
     return studentNo;
@@ -62,6 +62,15 @@ public class Students {
 
   public void setYearLevel(String yearLevel) {
     this.yearLevel = yearLevel;
+  }
+
+
+  public byte[] getPicture() {
+    return picture;
+  }
+
+  public void setPicture(byte[] picture) {
+    this.picture = picture;
   }
 
 }

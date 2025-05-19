@@ -2,18 +2,25 @@ package com.itsariadust.qrattendance;
 
 import org.opencv.core.Mat;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.text.*;
 import java.util.ArrayList;
 import java.util.Calendar;
+
+import static com.itsariadust.qrattendance.QRAttendance.studentDao;
 
 public class SystemUI extends JFrame {
     private static QRAttendance qrAttendance;
     private static AttendanceTableModel attendanceTableModel;
     private LogWindow logWindow;
+
     // Component variables
     private JLabel imageLabel;
     private JLabel label;
@@ -23,6 +30,7 @@ public class SystemUI extends JFrame {
     private JTextField[] textFields;
     private JButton logButton;
     private JTable logTable;
+    private JLabel studentImg;
 
     // Variables for dates
     private SimpleDateFormat timeFormat;
@@ -168,6 +176,10 @@ public class SystemUI extends JFrame {
         return image;
     }
 
+    public void displayImage(ImageIcon image) {
+        imageLabel.setIcon(image);
+    }
+
     public void setTime() {
         // Update time immediately
         updateClock();
@@ -188,14 +200,12 @@ public class SystemUI extends JFrame {
         dateLabel.setText(date);
     }
 
-    public void displayStudentInfo(String studentNo, String studentName,
-                                   String program, String yearLevel,
-                                   String status) {
-        textFields[0].setText(studentNo); // Student No.
-        textFields[1].setText(studentName); // Name
-        textFields[2].setText(program); // Program
-        textFields[3].setText(yearLevel); // Year Level
-        textFields[4].setText(status); // Status
+    public void displayStudentInfo(ArrayList<String> studentInfo) {
+        textFields[0].setText(studentInfo.get(0)); // Student No.
+        textFields[1].setText(studentInfo.get(1)); // Name
+        textFields[2].setText(studentInfo.get(2)); // Program
+        textFields[3].setText(studentInfo.get(3)); // Year Level
+        textFields[4].setText(studentInfo.get(4)); // Status
     }
 
     public void invalidStudentDialog() {
@@ -231,6 +241,13 @@ public class SystemUI extends JFrame {
             infoGbc.gridx = 0;
             infoGbc.gridy = 0;
 
+            JPanel attendanceInfoFields = new JPanel(new GridBagLayout());
+            GridBagConstraints infoFieldsGbc = new GridBagConstraints();
+            infoFieldsGbc.insets = new Insets(5, 5, 5, 5);
+            infoFieldsGbc.fill = GridBagConstraints.HORIZONTAL;
+            infoFieldsGbc.gridx = 0;
+            infoFieldsGbc.gridy = 0;
+
             // Labels and TextFields
             String[] labels = {"Student No:", "Name:", "Program:", "Year Level:", "Status:", "Timestamp: "};
             textFields = new JTextField[labels.length];
@@ -243,16 +260,23 @@ public class SystemUI extends JFrame {
                 textFields[i].setEditable(false);
                 textFields[i].setFocusable(false);
 
-                infoGbc.gridx = 0; // Label on the left
-                infoGbc.weightx = 0.3;
-                attendanceInfo.add(label, infoGbc);
+                infoFieldsGbc.gridx = 1; // Label on the left
+                infoFieldsGbc.weightx = 0.3;
+                attendanceInfoFields.add(label, infoFieldsGbc);
 
-                infoGbc.gridx = 1; // Text field on the right
-                infoGbc.weightx = 0.7;
-                attendanceInfo.add(textFields[i], infoGbc);
+                infoFieldsGbc.gridx = 2; // Text field on the right
+                infoFieldsGbc.weightx = 0.5;
+                attendanceInfoFields.add(textFields[i], infoFieldsGbc);
 
-                infoGbc.gridy++; // Move to next row
+                infoFieldsGbc.gridy++; // Move to next row
             }
+            infoGbc.gridx = 1;
+            attendanceInfo.add(attendanceInfoFields, infoGbc);
+
+            // Student Image
+            studentImg = new JLabel();
+            infoGbc.gridx = 0;
+            attendanceInfo.add(studentImg, infoGbc);
 
             gbc.gridx = 1;
             gbc.gridy = 0;
@@ -270,6 +294,7 @@ public class SystemUI extends JFrame {
                     return false;
                 };
             };
+            logTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
             addTableSelectionListener(logTable);
             JScrollPane sp = new JScrollPane(logTable);
             logPanel.add(sp, BorderLayout.CENTER);
@@ -288,7 +313,21 @@ public class SystemUI extends JFrame {
                         int modelRow = table.convertRowIndexToModel(selectedRow);
                         String idValue = table.getModel().getValueAt(modelRow, 0).toString();
                         ArrayList<String> record = qrAttendance.getAttendanceInfo(QRAttendance.attendanceDao,
-                                QRAttendance.studentDao, idValue);
+                                studentDao, idValue);
+                        byte[] studentImgByte = studentDao.findPicture(record.get(0));
+                        InputStream is = new ByteArrayInputStream(studentImgByte);
+                        BufferedImage img = null;
+                        try {
+                            img = ImageIO.read(is);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                        Image scaledImg = img.getScaledInstance(300, 300, Image.SCALE_SMOOTH);
+                        if (scaledImg == null) {
+                            System.out.println("ImageIO.read returned null – image data may be corrupted or invalid format.");
+                            return;
+                        }
+                        studentImg.setIcon(new ImageIcon(scaledImg));
                         textFields[0].setText(record.get(0)); // Student No.
                         textFields[1].setText(record.get(1)); // Name
                         textFields[2].setText(record.get(2)); // Program
